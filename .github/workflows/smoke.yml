@@ -1,0 +1,143 @@
+name: smoke
+
+# Two-tier CI:
+#   - `tests`  runs on every PR and push; no secrets, no LLM calls,
+#              completes in ~1 minute. This is the regression gate.
+#   - `eval`   runs only on push to main (or manual dispatch). Calls real
+#              LLMs via OPENAI_API_KEY (and optionally ANTHROPIC_API_KEY),
+#              so it costs money. Keeps PR cost at zero.
+#
+# To enable the eval job, add OPENAI_API_KEY (required) and optionally
+# ANTHROPIC_API_KEY in repo Settings → Secrets → Actions.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_eval:
+        description: "Also run the live-LLM eval job (costs ~$0.05)"
+        required: false
+        default: "true"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Non-eval smoke: knowledge loader, RAG pipeline (offline embedder), LLM
+  # adapter shape, API TestClient. ~30 tests, no API keys, no network.
+  # ---------------------------------------------------------------------------
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
+
+      - name: Cache ChromaDB ONNX model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[llm,rag,eval]"
+
+      - name: Ruff lint
+        run: ruff check apps knowledge scripts tests || true
+        # `|| true` for now — fail-soft until we tighten the config.
+
+      - name: Smoke tests (non-eval)
+        env:
+          SMOKE_MAX_CASES: "50"
+        run: pytest -m smoke --ignore=tests/eval -v
+
+  # ---------------------------------------------------------------------------
+  # Live-LLM eval: only on push to main, or explicit workflow_dispatch.
+  # Skipped on PRs to keep cost at zero.
+  # ---------------------------------------------------------------------------
+  eval:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_eval == 'true')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
+
+      - name: Cache ChromaDB ONNX model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[llm,rag,eval]"
+
+      - name: Verify OPENAI_API_KEY is set
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY secret is not configured. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is set (length=$(echo -n "$OPENAI_API_KEY" | wc -c))"
+
+      - name: Seed ChromaDB (curated docs only — raw/ is gitignored)
+        run: python -m scripts.seed_chroma
+
+      - name: Live-LLM smoke tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SMOKE_MAX_CASES: "50"
+          JUDGE_MODEL: "gpt-4o-mini"
+          SUT_MODEL: "gpt-4o-mini"
+        run: pytest -m smoke tests/eval -v
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: |
+            eval_results/
+            .deepeval/
+          if-no-files-found: ignore
+          retention-days: 14
