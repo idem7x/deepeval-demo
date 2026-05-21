@@ -1,32 +1,46 @@
 """
-Shared pytest fixtures for the DeepEval Lab test suite.
+Shared pytest fixtures + the smoke-mode case cap.
 
-This file is intentionally tiny in Phase 0 — it grows as we add real metrics.
-Right now it only enforces the smoke-mode case cap so CI cannot blow the
-budget if someone accidentally adds a huge dataset.
+The cap (`$SMOKE_MAX_CASES`, default 50) protects CI cost from
+**parametrized** eval tests that explode with data — e.g. Phase 6 will
+parametrize one test over 30+ goldens. Without a cap, expanding the
+dataset can silently 10× the bill.
+
+Crucially, the cap is applied **per test function**, only to functions
+that use `pytest.mark.parametrize`. Non-parametrized tests are never
+touched, so adding a regular assertion test doesn't risk eating into
+the cap.
 """
 
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 
 import pytest
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Cap the number of `smoke` tests when running with `-m smoke`.
-
-    Keeps CI cost predictable. The cap comes from $SMOKE_MAX_CASES (default 15).
-    """
     marker_expr = config.getoption("-m") or ""
     if "smoke" not in marker_expr:
         return
 
-    cap = int(os.environ.get("SMOKE_MAX_CASES", "15"))
-    smoke_items = [i for i in items if i.get_closest_marker("smoke")]
-    if len(smoke_items) <= cap:
-        return
+    cap = int(os.environ.get("SMOKE_MAX_CASES", "50"))
+
+    # Group by parent test function (one nodeid prefix). Non-parametrized
+    # tests have exactly one item per group; they're never trimmed.
+    groups: dict[str, list[pytest.Item]] = defaultdict(list)
+    for item in items:
+        if not item.get_closest_marker("smoke"):
+            continue
+        # Parametrized id is "tests/foo.py::test_name[case]"; the prefix
+        # before "[" is the function's nodeid.
+        key = item.nodeid.split("[", 1)[0]
+        groups[key].append(item)
 
     skip = pytest.mark.skip(reason=f"capped by SMOKE_MAX_CASES={cap}")
-    for item in smoke_items[cap:]:
-        item.add_marker(skip)
+    for key, group in groups.items():
+        if len(group) <= cap:
+            continue
+        for item in group[cap:]:
+            item.add_marker(skip)
