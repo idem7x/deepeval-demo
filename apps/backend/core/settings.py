@@ -35,7 +35,9 @@ class Settings(BaseSettings):
 
     # --- RAG ------------------------------------------------------------------
     chroma_path: Path = Field(default=Path("./.chroma"))
-    embedding_provider: Literal["ollama", "openai"] = "ollama"
+    # `chromadb` is the offline default (ONNX MiniLM, no key, no Ollama).
+    # Switch to `ollama` or `openai` for higher-quality embeddings.
+    embedding_provider: Literal["chromadb", "ollama", "openai"] = "chromadb"
     embedding_model: str = "nomic-embed-text"
 
     # --- App ------------------------------------------------------------------
