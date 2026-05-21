@@ -1,32 +1,48 @@
-"""
-FastAPI entrypoint.
+"""FastAPI entrypoint — wires all routers and CORS.
 
-Phase 0 — only a `/health` endpoint exists. Real routes (`/chat`, `/models`,
-`/arena`, `/eval`) are added in Phase 4 once the LLM adapters and RAG
-pipeline are in place.
+Phases:
+- /health (Phase 0)
+- /models (Phase 4)
+- /chat   (Phase 4)
+- /arena  (Phase 4)
+- /eval   (Phase 4 stub; full impl in Phase 7)
 """
 
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from apps.backend.api import arena_route, chat_route, eval_route, models_route
 from apps.backend.core.settings import settings
 
 app = FastAPI(
     title="DeepEval Lab",
-    version="0.1.0",
+    version="0.4.0",
     description="Multi-model chat with RAG and full DeepEval metric coverage.",
 )
+
+# CORS — Next.js dev server on 3000 is the only origin we expect in dev.
+# Production wiring (when there is a deployed frontend) would pin the URL.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(models_route.router)
+app.include_router(chat_route.router)
+app.include_router(arena_route.router)
+app.include_router(eval_route.router)
 
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    """Liveness probe + a tiny snapshot of what the app sees in its env.
-
-    Returns which providers have credentials configured (we never return the
-    keys themselves). Useful when you just installed the project and want to
-    sanity-check that `.env` is being picked up.
-    """
     return {
         "status": "ok",
         "providers": {
