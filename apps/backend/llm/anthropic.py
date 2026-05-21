@@ -1,8 +1,21 @@
-"""Anthropic adapter — Messages API via the official `anthropic` SDK."""
+"""Anthropic adapter — Messages API via the official `anthropic` SDK.
+
+TLS workaround
+--------------
+On macOS with Python 3.12 + OpenSSL 3.6 (which is the Homebrew default),
+a TLS 1.3 ClientHello to Anthropic's edge is occasionally answered with a
+TCP RST ("Connection reset by peer") — likely TLS fingerprinting upstream.
+The same machine's `curl` works (it uses LibreSSL via macOS SecureTransport
+and TLS 1.2). To make Python parity, we pin the SDK's underlying httpx
+client to TLS 1.2 max. No-op on systems where TLS 1.3 already works.
+"""
 
 from __future__ import annotations
 
+import ssl
 from typing import AsyncIterator
+
+import httpx
 
 from apps.backend.core.settings import settings
 from apps.backend.llm.base import (
@@ -25,6 +38,13 @@ KNOWN_CHAT_MODELS: list[tuple[str, str]] = [
 ]
 
 
+def _build_http_client() -> httpx.AsyncClient:
+    """An httpx.AsyncClient with TLS 1.2 ceiling (see module docstring)."""
+    ctx = ssl.create_default_context()
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+    return httpx.AsyncClient(verify=ctx, timeout=60.0)
+
+
 class AnthropicAdapter:
     provider = "anthropic"
     default_model = "claude-haiku-4-5"
@@ -35,20 +55,22 @@ class AnthropicAdapter:
         key = api_key or settings.anthropic_api_key
         if not key:
             raise AdapterError("Anthropic adapter requires ANTHROPIC_API_KEY")
-        self._client = AsyncAnthropic(api_key=key)
+        self._client = AsyncAnthropic(api_key=key, http_client=_build_http_client())
 
     # --- message translation --------------------------------------------
 
     @staticmethod
-    def _split_system(messages: list[ChatMessage]) -> tuple[str | None, list[dict]]:
+    def _split_system(messages: list[ChatMessage]) -> tuple[list[dict] | None, list[dict]]:
         """Anthropic carries the system prompt outside the messages array.
 
-        We collapse any 'system' role messages into a single string. If
-        there are several (rare but legal in our schema), we join with a
-        blank line — Anthropic does the same internally.
+        Current Messages API expects `system` as a list of content blocks,
+        not a plain string — passing a string raises 400 "Input should be
+        a valid array". We wrap each system message as its own text block.
         """
         system_parts = [m.content for m in messages if m.role == "system"]
-        system = "\n\n".join(system_parts) if system_parts else None
+        system: list[dict] | None = (
+            [{"type": "text", "text": p} for p in system_parts] if system_parts else None
+        )
 
         out: list[dict] = []
         for m in messages:
@@ -84,11 +106,12 @@ class AnthropicAdapter:
         options: ChatOptions,
     ) -> ChatResponse:
         system, msgs = self._split_system(messages)
-        resp = await self._client.messages.create(
-            messages=msgs,
-            system=system,
-            **self._common_kwargs(options),
-        )
+        # The Messages API rejects `system=null` with "Input should be a valid
+        # array" — pass the kwarg only when we actually have a system message.
+        kw = self._common_kwargs(options)
+        if system is not None:
+            kw["system"] = system
+        resp = await self._client.messages.create(messages=msgs, **kw)
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         usage = TokenUsage(
             prompt_tokens=resp.usage.input_tokens,
@@ -108,11 +131,10 @@ class AnthropicAdapter:
         options: ChatOptions,
     ) -> AsyncIterator[str]:
         system, msgs = self._split_system(messages)
-        async with self._client.messages.stream(
-            messages=msgs,
-            system=system,
-            **self._common_kwargs(options),
-        ) as stream:
+        kw = self._common_kwargs(options)
+        if system is not None:
+            kw["system"] = system
+        async with self._client.messages.stream(messages=msgs, **kw) as stream:
             async for delta in stream.text_stream:
                 yield delta
 

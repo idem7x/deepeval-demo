@@ -106,6 +106,59 @@ export interface ArenaResponse {
   results: CandidateResult[];
 }
 
+// --- /eval -----------------------------------------------------------------
+
+export interface RunSummary {
+  run_id: string;
+  started_at: number;
+  finished_at: number | null;
+  sut_combos: [string, string][];
+  judge_combos: [string, string][];
+  suites: string[];
+  notes: string | null;
+  results_count: number;
+  passed_count: number;
+  avg_score: number | null;
+}
+
+export interface ResultRow {
+  id: number;
+  run_id: string;
+  ts: number;
+  sut_provider: string;
+  sut_model: string;
+  judge_provider: string;
+  judge_model: string;
+  suite: string;
+  metric: string;
+  case_id: string;
+  score: number | null;
+  threshold: number | null;
+  passed: number | null;          // 0 / 1 / null
+  reason: string | null;
+  duration_ms: number;
+}
+
+export interface RunDetail {
+  run: Omit<RunSummary, "results_count" | "passed_count" | "avg_score">;
+  results: ResultRow[];
+}
+
+export interface Cell {
+  sut: string;
+  judge: string;
+  suite: string;
+  metric: string;
+  passed: number;
+  total: number;
+  avg_score: number | null;
+}
+
+export interface RunCells {
+  run: Omit<RunSummary, "results_count" | "passed_count" | "avg_score">;
+  cells: Cell[];
+}
+
 // --- /chat stream events ---------------------------------------------------
 
 export type StreamEvent =

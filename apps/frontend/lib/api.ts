@@ -11,6 +11,9 @@ import type {
   ChatRequest,
   ChatResponse,
   ModelsResponse,
+  RunCells,
+  RunDetail,
+  RunSummary,
   SessionDetail,
   StreamEvent,
 } from "./types";
@@ -101,6 +104,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(req),
     });
+  },
+
+  async evalRuns(limit = 50): Promise<{ runs: RunSummary[] }> {
+    return request<{ runs: RunSummary[] }>(`/eval/runs?limit=${limit}`);
+  },
+
+  async evalRun(runId: string): Promise<RunDetail> {
+    return request<RunDetail>(`/eval/runs/${runId}`);
+  },
+
+  async evalRunCells(runId: string): Promise<RunCells> {
+    return request<RunCells>(`/eval/runs/${runId}/by-cell`);
   },
 };
 
