@@ -1,0 +1,98 @@
+[
+  {
+    "id": "itp-madrid",
+    "input": "What is the ITP transfer tax rate in Madrid for resale property?",
+    "expected_output": "ITP in Madrid is set at 6% for resale residential property — the lowest of the major Spanish autonomous communities.",
+    "must_mention": ["6%", "Madrid", "ITP"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": true
+  },
+  {
+    "id": "itp-catalonia-vs-andalucia",
+    "input": "Is ITP cheaper in Andalucía or Catalonia?",
+    "expected_output": "Andalucía applies 7% ITP; Catalonia is at the higher end (10%, 11% above €1M). Andalucía is materially cheaper.",
+    "must_mention": ["Andaluc", "Catal", "7%", "10%"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": true
+  },
+  {
+    "id": "golden-visa-current",
+    "input": "Can I still get a Spanish Golden Visa by buying a property in 2026?",
+    "expected_output": "No. The real-estate route of the Spanish Golden Visa was repealed by Ley Orgánica 1/2025 and took effect on 3 April 2025. Buying property no longer grants residency.",
+    "must_mention": ["abolished", "2025", "Golden Visa"],
+    "rag_filter": {"topic": "visa"},
+    "smoke": true
+  },
+  {
+    "id": "nie-required",
+    "input": "Do I need a NIE to buy property in Spain as a foreigner?",
+    "expected_output": "Yes — a NIE is required to sign the deed, open a Spanish bank account, pay taxes, or take out a mortgage. It is the single hardest prerequisite to obtain on time.",
+    "must_mention": ["NIE", "required"],
+    "rag_filter": {"topic": "process"},
+    "smoke": false
+  },
+  {
+    "id": "ibi-who-pays",
+    "input": "Who pays IBI when a property is sold mid-year?",
+    "expected_output": "The owner on 1 January is legally liable, but the custom (confirmed by STS 409/2016) is to pro-rate IBI between seller and buyer.",
+    "must_mention": ["1 January", "pro-rate", "IBI"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": false
+  },
+  {
+    "id": "irnr-empty-property",
+    "input": "Do I have to file IRNR if my Spanish property sits empty all year?",
+    "expected_output": "Yes. Non-residents owe IRNR on an imputed income equal to 1.1% (or 2%) of valor catastral even when the property is unused. Form 210 is annual.",
+    "must_mention": ["IRNR", "imputed", "210"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": false
+  },
+  {
+    "id": "mortgage-ltv-uk",
+    "input": "As a UK resident, what loan-to-value can I expect on a Spanish mortgage?",
+    "expected_output": "Non-EU non-residents (including the UK post-Brexit) typically max out at 50–60% LTV against the lower of price and bank appraisal.",
+    "must_mention": ["50", "60", "LTV"],
+    "rag_filter": {"topic": "process"},
+    "smoke": false
+  },
+  {
+    "id": "plusvalia-who",
+    "input": "Is the seller or the buyer liable for plusvalía municipal?",
+    "expected_output": "The seller. But when the seller is non-resident, the buyer becomes a substitutional taxpayer, so lawyers withhold the estimated amount at the deed.",
+    "must_mention": ["seller", "substitutional", "non-resident"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": false
+  },
+  {
+    "id": "barcelona-airbnb",
+    "input": "Can I get a new short-term tourist licence for an apartment in Barcelona?",
+    "expected_output": "No — Barcelona has had a moratorium on new HUT licences since 2014. The number is frozen and the city has announced its intention to terminate all HUT licences by 2028.",
+    "must_mention": ["Barcelona", "moratorium", "2014"],
+    "rag_filter": {"topic": "process"},
+    "smoke": false
+  },
+  {
+    "id": "fein-cooling-off",
+    "input": "How many days before signing a mortgage deed must I receive the FEIN?",
+    "expected_output": "At least 10 calendar days, per Ley 5/2019. You must also visit a notary once during that window to acknowledge the terms.",
+    "must_mention": ["10", "FEIN", "5/2019"],
+    "rag_filter": {"topic": "process"},
+    "smoke": false
+  },
+  {
+    "id": "finca-rustica-buildable",
+    "input": "Can I build a house on a finca rústica I bought in Andalucía?",
+    "expected_output": "Generally no — finca rústica is non-buildable agricultural land. Always request a certificado urbanístico from the ayuntamiento before assuming any construction is allowed.",
+    "must_mention": ["rústica", "non-buildable", "urbanístico"],
+    "rag_filter": {"topic": "property-type"},
+    "smoke": false
+  },
+  {
+    "id": "valor-referencia",
+    "input": "What is valor de referencia and why does it matter for ITP?",
+    "expected_output": "Since 2022 ITP is calculated on the higher of the declared price and the valor de referencia published by the Catastro. Buying below valor de referencia still incurs ITP on the higher amount.",
+    "must_mention": ["valor de referencia", "Catastro", "2022"],
+    "rag_filter": {"topic": "tax"},
+    "smoke": false
+  }
+]
