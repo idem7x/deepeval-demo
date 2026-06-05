@@ -38,6 +38,7 @@ from apps.backend.eval.store import Result
 from apps.backend.llm.anthropic import AnthropicAdapter
 from apps.backend.llm.base import AdapterError, LLMAdapter
 from apps.backend.llm.deepeval_wrap import DeepEvalLLM
+from apps.backend.llm.ollama import OllamaAdapter
 from apps.backend.llm.openai import OpenAIAdapter
 
 
@@ -56,6 +57,8 @@ def _build_adapter(provider: str) -> LLMAdapter | None:
             return OpenAIAdapter()
         if provider == "anthropic":
             return AnthropicAdapter()
+        if provider == "ollama":
+            return OllamaAdapter()
     except AdapterError as e:
         console.print(f"  [yellow]skip {provider}[/]: {e}")
         return None
